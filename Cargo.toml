@@ -6,7 +6,9 @@ edition = "2021"
 [dependencies]
 anyhow = { version = "1.0.52", default-features = false, features = ["std"] }
 clap = { version = "=3.0.0-rc.11", default-features = false, features = ["std", "derive", "color"] }
+crates-index = { version = "0.18.2", default-features = false }
 fehler = { version = "1.0.0", default-features = false }
 fn-error-context = { version = "0.2.0", default-features = false }
+semver = { version = "1.0.4", default-features = false }
 tracing = { version = "0.1.29", default-features = false, features = ["attributes", "std"] }
 tracing-subscriber = { version = "0.3.5", default-features = false, features = ["env-filter", "fmt", "ansi", "tracing-log"] }
