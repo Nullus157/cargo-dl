@@ -1,4 +1,4 @@
-use anyhow::Error;
+use anyhow::{Context, Error};
 use clap::Parser;
 use tracing_subscriber::EnvFilter;
 
@@ -100,7 +100,7 @@ impl App {
             }
         };
 
-        tracing::debug!("selected version: {version_num}");
+        tracing::warn!("selected version: {version_num}");
 
         // TODO: check cargo cache
         // TODO: download
@@ -127,12 +127,48 @@ impl std::fmt::Display for App {
 }
 
 #[fehler::throws]
+#[fn_error_context::context("parsing directive {:?}", directive)]
+fn parse_directive(directive: &str) -> tracing_subscriber::filter::Directive {
+    directive.parse()?
+}
+
+#[fehler::throws]
+#[fn_error_context::context("getting directive from env var {:?}", var)]
+fn get_env_directive(var: &str) -> Option<tracing_subscriber::filter::Directive> {
+    if let Some(var) = std::env::var_os("CARGO_DL_LOG") {
+        let s = var.to_str().context("CARGO_DL_LOG not unicode")?;
+        Some(parse_directive(s)?)
+    } else {
+        None
+    }
+}
+
+fn env_filter() -> (EnvFilter, Option<anyhow::Error>) {
+    let filter = EnvFilter::new("WARN");
+    match get_env_directive("CARGO_DL_LOG") {
+        Ok(Some(directive)) => {
+            (filter.add_directive(directive), None)
+        }
+        Ok(None) => {
+            (filter, None)
+        }
+        Err(err) => {
+            (filter, Some(err.context("failed to apply log directive")))
+        }
+    }
+}
+
+#[fehler::throws]
 fn main() {
+    let (env_filter, err) = env_filter();
     tracing_subscriber::fmt()
-        .with_env_filter(EnvFilter::from_env("CARGO_DL_LOG"))
+        .with_env_filter(env_filter)
         .with_writer(std::io::stderr)
         .pretty()
         .init();
+    if let Some(err) = err {
+        tracing::warn!("{err:?}");
+    }
     let Command::Dl(app) = Command::parse();
     app.run()?;
 }
