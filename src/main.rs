@@ -1,6 +1,10 @@
+mod crate_name;
+mod package_id_spec;
+
 use anyhow::{Context, Error};
 use clap::Parser;
 use tracing_subscriber::EnvFilter;
+use crate::{package_id_spec::PackageIdSpec, crate_name::CrateName};
 
 const _USER_AGENT: &str = concat!("cargo-dl/", env!("CARGO_PKG_VERSION"));
 
@@ -28,15 +32,14 @@ struct App {
     #[clap(short, long)]
     output: Option<String>,
 
-    /// The crate to download.
-    #[clap(name = "CRATE")]
-    krate: String,
-
     // TODO: Easy way to download latest pre-release
     // TODO: Way to download yanked versions
+    /// The crate to download.
+    ///
     /// Which version of the crate to download, in the standard semver constraint format used in
     /// Cargo.toml. If unspecified the newest non-prerelease, non-yanked version will be fetched.
-    version_request: Option<semver::VersionReq>,
+    #[clap(name = "CRATE[:VERSION_REQ]")]
+    spec: PackageIdSpec,
 }
 
 impl App {
@@ -46,10 +49,10 @@ impl App {
         let index = crates_index::Index::new_cargo_default()?;
 
         // TODO: fuzzy name matching https://github.com/frewsxcv/rust-crates-index/issues/75
-        let krate = match index.crate_(&self.krate) {
+        let krate = match index.crate_(&self.spec.name.0) {
             Some(krate) => krate,
             None => {
-                tracing::error!("could not find crate {} in the index", self.krate);
+                tracing::error!("could not find crate `{}` in the index", self.spec.name);
                 return;
             }
         };
@@ -59,7 +62,7 @@ impl App {
             Vec::from_iter(krate.versions().iter().map(|v| v.version()))
         );
 
-        let version_request = self.version_request.unwrap_or(semver::VersionReq::STAR);
+        let version_request = self.spec.version_req.unwrap_or(semver::VersionReq::STAR);
         let versions = {
             let mut versions: Vec<_> = krate
                 .versions()
@@ -100,7 +103,7 @@ impl App {
             }
         };
 
-        tracing::warn!("selected version: {version_num}");
+        tracing::warn!("selected version `{version_num}`");
 
         // TODO: check cargo cache
         // TODO: download
@@ -119,10 +122,7 @@ impl std::fmt::Display for App {
         if let Some(output) = &self.output {
             write!(f, " --output={:?}", output)?;
         }
-        write!(f, " {}", self.krate)?;
-        if let Some(version_request) = &self.version_request {
-            write!(f, " {}", version_request)?;
-        }
+        write!(f, " {}", self.spec)?;
     }
 }
 
@@ -169,6 +169,21 @@ fn main() {
     if let Some(err) = err {
         tracing::warn!("{err:?}");
     }
-    let Command::Dl(app) = Command::parse();
-    app.run()?;
+    match Command::try_parse() {
+        Ok(Command::Dl(app)) => app.run()?,
+        Err(e @ clap::Error { kind: clap::ErrorKind::ValueValidation, .. }) => {
+            use std::error::Error;
+            println!("Error: invalid value for {}", e.info[0]);
+            println!();
+            if let Some(source) = e.source() {
+                println!("Caused by:");
+                let chain = anyhow::Chain::new(source);
+                for (i, error) in chain.into_iter().enumerate() {
+                    println!("    {i}: {error}");
+                }
+            }
+            std::process::exit(1);
+        }
+        Err(e) => e.exit(),
+    }
 }
