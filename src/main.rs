@@ -1,5 +1,6 @@
 mod crate_name;
 mod package_id_spec;
+mod cache;
 
 use anyhow::{Context, Error};
 use clap::Parser;
@@ -92,7 +93,7 @@ impl App {
         // TODO: If no matching versions, check for version matching but yanked versions and emit
         // warning
 
-        let (version_num, _version) = match versions.first() {
+        let (version_num, version) = match versions.first() {
             Some(val) => val,
             None => {
                 tracing::error!(
@@ -105,6 +106,7 @@ impl App {
 
         tracing::warn!("selected version `{version_num}`");
 
+        cache::lookup(&index, version)?;
         // TODO: check cargo cache
         // TODO: download
         // TODO: verify checksum
