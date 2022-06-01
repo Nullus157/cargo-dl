@@ -1,6 +1,7 @@
 mod crate_name;
 mod package_id_spec;
 mod cache;
+mod unpack;
 
 use anyhow::{Context, Error};
 use clap::Parser;
@@ -139,7 +140,9 @@ impl App {
             Ok(path) => {
                 tracing::debug!("found cached crate at {}", path.display());
                 if self.extract {
-                    todo!("extract cached file");
+                    let archive = tar::Archive::new(flate2::bufread::GzDecoder::new(std::io::BufReader::new(std::fs::File::open(path)?)));
+                    unpack::unpack(version, archive, &output)?;
+                    tracing::info!("{} {} extracted to {}", version.name(), version.version(), output);
                 } else {
                     std::fs::copy(path, &output)?;
                     tracing::info!("{} {} written to {}", version.name(), version.version(), output);
