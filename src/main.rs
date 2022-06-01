@@ -41,6 +41,10 @@ struct App {
     /// Cargo.toml. If unspecified the newest non-prerelease, non-yanked version will be fetched.
     #[clap(name = "CRATE[:VERSION_REQ]")]
     spec: PackageIdSpec,
+
+    /// Allow yanked versions to be chosen.
+    #[clap(long)]
+    allow_yanked: bool,
 }
 
 impl App {
@@ -68,7 +72,7 @@ impl App {
             let mut versions: Vec<_> = krate
                 .versions()
                 .iter()
-                .filter(|version| !version.is_yanked())
+                .filter(|version| self.allow_yanked || !version.is_yanked())
                 .filter_map(|version| match semver::Version::parse(version.version()) {
                     Ok(num) => Some((num, version)),
                     Err(err) => {
@@ -90,9 +94,6 @@ impl App {
             Vec::from_iter(versions.iter().map(|(num, _)| num))
         );
 
-        // TODO: If no matching versions, check for version matching but yanked versions and emit
-        // warning
-
         let (version_num, version) = match versions.first() {
             Some(val) => val,
             None => {
@@ -100,6 +101,29 @@ impl App {
                     "no version matching {version_request} found for {}",
                     krate.name()
                 );
+                let yanked_versions = {
+                    let mut versions: Vec<_> = krate
+                        .versions()
+                        .iter()
+                        .filter(|version| version.is_yanked())
+                        .filter_map(|version| match semver::Version::parse(version.version()) {
+                            Ok(num) => Some((num, version)),
+                            Err(err) => {
+                                tracing::warn!(
+                                    "Ignoring non-semver version {} {err:#?}",
+                                    version.version()
+                                );
+                                None
+                            }
+                        })
+                        .filter(|(num, _)| version_request.matches(num))
+                        .collect();
+                    versions.sort_by(|(a, _), (b, _)| a.cmp(b).reverse());
+                    versions
+                };
+                if let Some((num, _)) = yanked_versions.first() {
+                    tracing::warn!("The yanked version {num} matched, use `--allow-yanked` to download it");
+                }
                 return;
             }
         };
@@ -118,6 +142,9 @@ impl std::fmt::Display for App {
     #[fehler::throws(std::fmt::Error)]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) {
         write!(f, "cargo dl")?;
+        if self.allow_yanked {
+            write!(f, " --allow-yanked")?;
+        }
         if self.extract {
             write!(f, " --extract")?;
         }
