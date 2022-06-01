@@ -20,7 +20,7 @@ impl std::str::FromStr for PackageIdSpec {
     #[fehler::throws(ParseError)]
     fn from_str(s: &str) -> Self {
         let parse_crate_name = |s: &str| s.parse::<CrateName>().map_err(|e| ParseError::CrateName(e, s.to_owned()));
-        if let Some(i) = s.find(':') {
+        if let Some(i) = s.find('@') {
             let v = &s[(i + 1)..];
             Self {
                 name: parse_crate_name(&s[..i])?,
@@ -40,7 +40,7 @@ impl std::fmt::Display for PackageIdSpec {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) {
         write!(f, "{}", self.name)?;
         if let Some(version_req) = &self.version_req {
-            write!(f, ":{}", version_req)?;
+            write!(f, "@{}", version_req)?;
         }
     }
 }
