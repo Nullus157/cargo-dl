@@ -128,20 +128,28 @@ impl App {
             }
         };
 
-        tracing::warn!("selected version `{version_num}`");
+        tracing::info!("selected version `{version_num}`");
 
+        let output = self.output.unwrap_or_else(|| if self.extract {
+            format!("{}-{}", version.name(), version.version())
+        } else {
+            format!("{}-{}.crate", version.name(), version.version())
+        });
         match cache::lookup(&index, version) {
             Ok(path) => {
                 tracing::debug!("found cached crate at {}", path.display());
+                if self.extract {
+                    todo!("extract cached file");
+                } else {
+                    std::fs::copy(path, &output)?;
+                    tracing::info!("{} {} written to {}", version.name(), version.version(), output);
+                }
             }
             Err(err) => {
                 tracing::debug!("{err:?}");
+                todo!("download, verify checksum, extract/save");
             }
         }
-
-        // TODO: download
-        // TODO: verify checksum
-        // TODO: maybe extract
     }
 }
 
@@ -180,7 +188,7 @@ fn get_env_directive(var: &str) -> Option<tracing_subscriber::filter::Directive>
 }
 
 fn env_filter() -> (EnvFilter, Option<anyhow::Error>) {
-    let filter = EnvFilter::new("WARN");
+    let filter = EnvFilter::new("INFO");
     match get_env_directive("CARGO_DL_LOG") {
         Ok(Some(directive)) => {
             (filter.add_directive(directive), None)
