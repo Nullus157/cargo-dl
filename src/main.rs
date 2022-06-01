@@ -91,7 +91,7 @@ impl App {
 
         tracing::debug!(
             "matching versions: {:?}",
-            Vec::from_iter(versions.iter().map(|(num, _)| num))
+            Vec::from_iter(versions.iter().map(|(num, _)| num.to_string()))
         );
 
         let (version_num, version) = match versions.first() {
@@ -130,8 +130,15 @@ impl App {
 
         tracing::warn!("selected version `{version_num}`");
 
-        cache::lookup(&index, version)?;
-        // TODO: check cargo cache
+        match cache::lookup(&index, version) {
+            Ok(path) => {
+                tracing::debug!("found cached crate at {}", path.display());
+            }
+            Err(err) => {
+                tracing::debug!("{err:?}");
+            }
+        }
+
         // TODO: download
         // TODO: verify checksum
         // TODO: maybe extract

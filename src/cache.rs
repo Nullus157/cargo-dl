@@ -1,3 +1,4 @@
+use std::path::PathBuf;
 use anyhow::{anyhow, Context, Error};
 use crates_index::{Index, Version};
 
@@ -49,20 +50,22 @@ pub(crate) fn find_cache_dir(index: &Index) -> std::path::PathBuf {
 
 #[fehler::throws]
 #[fn_error_context::context(
-    "finding cached file for {}@{} in registry {}",
+    "failed finding cached file for {}@{} in registry {}",
     version.name(),
     version.version(),
     index.path().display(),
 )]
-pub(crate) fn lookup(index: &Index, version: &Version) {
+pub(crate) fn lookup(index: &Index, version: &Version) -> PathBuf {
     let cache_dir = find_cache_dir(index)?;
 
     let cache_file = cache_dir.join(format!("{}-{}.crate", version.name(), version.version()));
     if !cache_file.exists() {
-        fehler::throw!(anyhow!("could not find crate in cache dir"));
+        fehler::throw!(anyhow!("cache file {} does not exist", cache_file.display()));
     }
 
-    if &sha256_file(cache_file)? != version.checksum() {
+    if &sha256_file(&cache_file)? != version.checksum() {
         fehler::throw!(anyhow!("invalid checksum"));
     }
+
+    cache_file
 }
