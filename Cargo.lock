@@ -66,6 +66,7 @@ dependencies = [
  "fehler",
  "flate2",
  "fn-error-context",
+ "hex",
  "semver",
  "sha2",
  "tar",

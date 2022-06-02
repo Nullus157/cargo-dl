@@ -63,8 +63,9 @@ pub(crate) fn lookup(index: &Index, version: &Version) -> PathBuf {
         fehler::throw!(anyhow!("cache file {} does not exist", cache_file.display()));
     }
 
-    if &sha256_file(&cache_file)? != version.checksum() {
-        fehler::throw!(anyhow!("invalid checksum"));
+    let calculated_checksum = sha256_file(&cache_file)?;
+    if &calculated_checksum != version.checksum() {
+        fehler::throw!(anyhow!("invalid checksum, expected {} but got {}", hex::encode(version.checksum()), hex::encode(calculated_checksum)));
     }
 
     cache_file
