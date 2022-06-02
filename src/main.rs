@@ -10,7 +10,7 @@ use tracing_subscriber::EnvFilter;
 use crate::{package_id_spec::PackageIdSpec, crate_name::CrateName};
 
 const USER_AGENT: &str = concat!("cargo-dl/", env!("CARGO_PKG_VERSION"));
-const CRATE_SIZE_LIMIT: u64 = 10 * 1024 * 1024;
+const CRATE_SIZE_LIMIT: u64 = 40 * 1024 * 1024;
 
 #[derive(Debug, Parser)]
 #[clap(bin_name = "cargo", version, about)]
@@ -48,14 +48,34 @@ struct App {
     /// Allow yanked versions to be chosen.
     #[clap(long)]
     allow_yanked: bool,
+
+    /// Slow down operations for manually testing UI
+    #[clap(long)]
+    slooooow: bool,
 }
 
 impl App {
+    fn slow(&self) {
+        if self.slooooow {
+            std::thread::sleep(std::time::Duration::from_secs(2));
+        }
+    }
+
     #[fehler::throws]
     #[tracing::instrument(fields(%self))]
     fn run(self) {
-        let index = crates_index::Index::new_cargo_default()?;
+        let mut index = crates_index::Index::new_cargo_default()?;
+        let bar = indicatif::ProgressBar::new_spinner().with_style(indicatif::ProgressStyle::default_spinner().template("{prefix:>12.bright.cyan} {spinner} {msg:.cyan}"))
+            .with_prefix("Updating")
+        .with_message("index");
+        bar.enable_steady_tick(100);
+        index.update()?;
+        self.slow();
+        bar.println("Updated index");
 
+        bar.set_prefix("Finding");
+        bar.set_message(self.spec.name.0.clone());
+        self.slow();
         // TODO: fuzzy name matching https://github.com/frewsxcv/rust-crates-index/issues/75
         let krate = match index.crate_(&self.spec.name.0) {
             Some(krate) => krate,
@@ -70,7 +90,7 @@ impl App {
             Vec::from_iter(krate.versions().iter().map(|v| v.version()))
         );
 
-        let version_request = self.spec.version_req.unwrap_or(semver::VersionReq::STAR);
+        let version_request = self.spec.version_req.clone().unwrap_or(semver::VersionReq::STAR);
         let versions = {
             let mut versions: Vec<_> = krate
                 .versions()
@@ -97,7 +117,7 @@ impl App {
             Vec::from_iter(versions.iter().map(|(num, _)| num.to_string()))
         );
 
-        let (version_num, version) = match versions.first() {
+        let (_, version) = match versions.first() {
             Some(val) => val,
             None => {
                 tracing::error!(
@@ -131,9 +151,12 @@ impl App {
             }
         };
 
-        tracing::info!("selected version `{version_num}`");
+        bar.println(format!("Found {} {}", version.name(), version.version()));
+        bar.set_prefix("Checking");
+        bar.set_message(format!("cache for {} {}", version.name(), version.version()));
+        self.slow();
 
-        let output = self.output.unwrap_or_else(|| if self.extract {
+        let output = self.output.clone().unwrap_or_else(|| if self.extract {
             format!("{}-{}", version.name(), version.version())
         } else {
             format!("{}-{}.crate", version.name(), version.version())
@@ -141,21 +164,40 @@ impl App {
         match cache::lookup(&index, version) {
             Ok(path) => {
                 tracing::debug!("found cached crate at {}", path.display());
+                bar.println("found cached crate");
                 if self.extract {
+                    bar.set_prefix("Extracting");
+                    bar.set_message(format!("{} {} to {}", version.name(), version.version(), output));
+                    self.slow();
                     let archive = tar::Archive::new(flate2::bufread::GzDecoder::new(std::io::BufReader::new(std::fs::File::open(path)?)));
                     unpack::unpack(version, archive, &output)?;
-                    tracing::info!("{} {} extracted to {}", version.name(), version.version(), output);
+                    bar.finish_with_message(format!("{} {} extracted to {}", version.name(), version.version(), output));
                 } else {
+                    bar.set_prefix("Writing");
+                    bar.set_message(format!("{} {} to {}", version.name(), version.version(), output));
+                    self.slow();
                     std::fs::copy(path, &output)?;
-                    tracing::info!("{} {} written to {}", version.name(), version.version(), output);
+                    bar.finish_with_message(format!("{} {} written to {}", version.name(), version.version(), output));
                 }
             }
             Err(err) => {
+                bar.println("no cached crate");
                 use sha2::Digest;
                 tracing::debug!("{err:?}");
                 let url = version.download_url(&index.index_config()?).context("missing download url")?;
-                let mut data = Vec::with_capacity(usize::try_from(CRATE_SIZE_LIMIT)?);
-                ureq::get(&url).set("User-Agent", USER_AGENT).call()?.into_reader().take(CRATE_SIZE_LIMIT).read_to_end(&mut data)?;
+                bar.set_prefix("Downloading");
+                bar.set_message(format!("{} {}", version.name(), version.version()));
+                let resp = ureq::get(&url).set("User-Agent", USER_AGENT).call()?;
+                let mut data;
+                if let Some(len) = resp.header("Content-Length").and_then(|s| s.parse::<usize>().ok()) {
+                    data = Vec::with_capacity(len);
+                    bar.set_style(indicatif::ProgressStyle::default_bar().template("{prefix:>12.bright.cyan} [{bar:27}] {bytes:>9}/{total_bytes:9}  {bytes_per_sec} {elapsed:>4}/{eta:4} - {msg:.cyan}"));
+                    bar.set_length(u64::try_from(len)?);
+                } else {
+                    data = Vec::with_capacity(usize::try_from(CRATE_SIZE_LIMIT)?);
+                }
+                bar.wrap_read(resp.into_reader()).take(CRATE_SIZE_LIMIT).read_to_end(&mut data)?;
+                self.slow();
                 tracing::debug!("downloaded crate ({} bytes)", data.len());
                 let calculated_checksum = sha2::Sha256::digest(&data);
                 if calculated_checksum.as_slice() != version.checksum() {
@@ -166,10 +208,10 @@ impl App {
                 if self.extract {
                     let archive = tar::Archive::new(flate2::bufread::GzDecoder::new(std::io::Cursor::new(data)));
                     unpack::unpack(version, archive, &output)?;
-                    tracing::info!("{} {} extracted to {}", version.name(), version.version(), output);
+                    bar.println(format!("{} {} extracted to {}", version.name(), version.version(), output));
                 } else {
                     std::fs::write(&output, data)?;
-                    tracing::info!("{} {} written to {}", version.name(), version.version(), output);
+                    bar.println(format!("{} {} written to {}", version.name(), version.version(), output));
                 }
             }
         }
