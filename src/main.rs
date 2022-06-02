@@ -3,12 +3,14 @@ mod package_id_spec;
 mod cache;
 mod unpack;
 
-use anyhow::{Context, Error};
+use std::io::Read;
+use anyhow::{anyhow, Context, Error};
 use clap::Parser;
 use tracing_subscriber::EnvFilter;
 use crate::{package_id_spec::PackageIdSpec, crate_name::CrateName};
 
-const _USER_AGENT: &str = concat!("cargo-dl/", env!("CARGO_PKG_VERSION"));
+const USER_AGENT: &str = concat!("cargo-dl/", env!("CARGO_PKG_VERSION"));
+const CRATE_SIZE_LIMIT: u64 = 10 * 1024 * 1024;
 
 #[derive(Debug, Parser)]
 #[clap(bin_name = "cargo", version, about)]
@@ -149,8 +151,26 @@ impl App {
                 }
             }
             Err(err) => {
+                use sha2::Digest;
                 tracing::debug!("{err:?}");
-                todo!("download, verify checksum, extract/save");
+                let url = version.download_url(&index.index_config()?).context("missing download url")?;
+                let mut data = Vec::with_capacity(usize::try_from(CRATE_SIZE_LIMIT)?);
+                ureq::get(&url).set("User-Agent", USER_AGENT).call()?.into_reader().take(CRATE_SIZE_LIMIT).read_to_end(&mut data)?;
+                tracing::debug!("downloaded crate ({} bytes)", data.len());
+                let calculated_checksum = sha2::Sha256::digest(&data);
+                if calculated_checksum.as_slice() != version.checksum() {
+                    fehler::throw!(anyhow!("invalid checksum, expected {} but got {}", hex::encode(version.checksum()), hex::encode(calculated_checksum)));
+                }
+                tracing::debug!("verified checksum ({})", hex::encode(version.checksum()));
+
+                if self.extract {
+                    let archive = tar::Archive::new(flate2::bufread::GzDecoder::new(std::io::Cursor::new(data)));
+                    unpack::unpack(version, archive, &output)?;
+                    tracing::info!("{} {} extracted to {}", version.name(), version.version(), output);
+                } else {
+                    std::fs::write(&output, data)?;
+                    tracing::info!("{} {} written to {}", version.name(), version.version(), output);
+                }
             }
         }
     }

@@ -18,3 +18,4 @@ tar = { version = "0.4.38", default-features = false }
 thiserror = { version = "1.0.30", default-features = false }
 tracing = { version = "0.1.29", default-features = false, features = ["attributes", "std"] }
 tracing-subscriber = { version = "0.3.5", default-features = false, features = ["env-filter", "fmt", "ansi", "tracing-log"] }
+ureq = { version = "2.4.0", default-features = false, features = ["gzip", "brotli", "tls"] }
