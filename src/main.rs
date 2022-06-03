@@ -50,8 +50,20 @@ struct App {
     allow_yanked: bool,
 
     /// Slow down operations for manually testing UI
-    #[clap(long)]
+    #[clap(long, hide = true)]
     slooooow: bool,
+}
+
+fn success(prefix: impl std::fmt::Display, msg: impl std::fmt::Display) -> String {
+    stylish::ansi::format!("{prefix:>12(fg=green,bold)} {msg}")
+}
+
+fn warning(prefix: impl std::fmt::Display, msg: impl std::fmt::Display) -> String {
+    stylish::ansi::format!("{prefix:>12(fg=yellow,bold)} {msg}")
+}
+
+fn failure(prefix: impl std::fmt::Display, msg: impl std::fmt::Display) -> String {
+    stylish::ansi::format!("{prefix:>12(fg=red,bold)} {msg}")
 }
 
 impl App {
@@ -65,16 +77,16 @@ impl App {
     #[tracing::instrument(fields(%self))]
     fn run(self) {
         let mut index = crates_index::Index::new_cargo_default()?;
-        let bar = indicatif::ProgressBar::new_spinner().with_style(indicatif::ProgressStyle::default_spinner().template("{prefix:>12.bright.cyan} {spinner} {msg:.cyan}"))
+        let bar = indicatif::ProgressBar::new_spinner().with_style(indicatif::ProgressStyle::default_spinner().template("{prefix:>12.bold.cyan} {spinner} {msg}"))
             .with_prefix("Updating")
-        .with_message("index");
+        .with_message("crates.io index");
         bar.enable_steady_tick(100);
         index.update()?;
         self.slow();
-        bar.println("Updated index");
 
-        bar.set_prefix("Finding");
-        bar.set_message(self.spec.name.0.clone());
+        bar.println(success("Updated", "crates.io index"));
+        bar.set_prefix("Selecting");
+        bar.set_message(self.spec.to_string());
         self.slow();
         // TODO: fuzzy name matching https://github.com/frewsxcv/rust-crates-index/issues/75
         let krate = match index.crate_(&self.spec.name.0) {
@@ -120,10 +132,8 @@ impl App {
         let (_, version) = match versions.first() {
             Some(val) => val,
             None => {
-                tracing::error!(
-                    "no version matching {version_request} found for {}",
-                    krate.name()
-                );
+                bar.println(failure("Failure", format_args!("no version matching {} found", self.spec)));
+                bar.finish_and_clear();
                 let yanked_versions = {
                     let mut versions: Vec<_> = krate
                         .versions()
@@ -145,15 +155,15 @@ impl App {
                     versions
                 };
                 if let Some((num, _)) = yanked_versions.first() {
-                    tracing::warn!("The yanked version {num} matched, use `--allow-yanked` to download it");
+                    bar.println(warning("Info", format_args!("The yanked version {num} matched, use `--allow-yanked` to download it")));
                 }
                 return;
             }
         };
 
-        bar.println(format!("Found {} {}", version.name(), version.version()));
+        bar.println(success("Selected", format_args!("{} {} for {}", version.name(), version.version(), self.spec)));
         bar.set_prefix("Checking");
-        bar.set_message(format!("cache for {} {}", version.name(), version.version()));
+        bar.set_message("cache");
         self.slow();
 
         let output = self.output.clone().unwrap_or_else(|| if self.extract {
@@ -164,24 +174,24 @@ impl App {
         match cache::lookup(&index, version) {
             Ok(path) => {
                 tracing::debug!("found cached crate at {}", path.display());
-                bar.println("found cached crate");
+                bar.println(success("Checked", "cached crate found"));
                 if self.extract {
                     bar.set_prefix("Extracting");
                     bar.set_message(format!("{} {} to {}", version.name(), version.version(), output));
                     self.slow();
                     let archive = tar::Archive::new(flate2::bufread::GzDecoder::new(std::io::BufReader::new(std::fs::File::open(path)?)));
                     unpack::unpack(version, archive, &output)?;
-                    bar.finish_with_message(format!("{} {} extracted to {}", version.name(), version.version(), output));
+                    bar.println(success("Extracted", format_args!("{} {} to {}", version.name(), version.version(), output)));
                 } else {
                     bar.set_prefix("Writing");
                     bar.set_message(format!("{} {} to {}", version.name(), version.version(), output));
                     self.slow();
                     std::fs::copy(path, &output)?;
-                    bar.finish_with_message(format!("{} {} written to {}", version.name(), version.version(), output));
+                    bar.println(success("Written", format_args!("{} {} to {}", version.name(), version.version(), output)));
                 }
             }
             Err(err) => {
-                bar.println("no cached crate");
+                bar.println(warning("Checked", "cached crate not found"));
                 use sha2::Digest;
                 tracing::debug!("{err:?}");
                 let url = version.download_url(&index.index_config()?).context("missing download url")?;
@@ -191,7 +201,7 @@ impl App {
                 let mut data;
                 if let Some(len) = resp.header("Content-Length").and_then(|s| s.parse::<usize>().ok()) {
                     data = Vec::with_capacity(len);
-                    bar.set_style(indicatif::ProgressStyle::default_bar().template("{prefix:>12.bright.cyan} [{bar:27}] {bytes:>9}/{total_bytes:9}  {bytes_per_sec} {elapsed:>4}/{eta:4} - {msg:.cyan}"));
+                    bar.set_style(indicatif::ProgressStyle::default_bar().template("{prefix:>12.bold.cyan} [{bar:27}] {bytes:>9}/{total_bytes:9}  {bytes_per_sec} {elapsed:>4}/{eta:4} - {msg}"));
                     bar.set_length(u64::try_from(len)?);
                 } else {
                     data = Vec::with_capacity(usize::try_from(CRATE_SIZE_LIMIT)?);
@@ -199,22 +209,35 @@ impl App {
                 bar.wrap_read(resp.into_reader()).take(CRATE_SIZE_LIMIT).read_to_end(&mut data)?;
                 self.slow();
                 tracing::debug!("downloaded crate ({} bytes)", data.len());
+                bar.set_style(indicatif::ProgressStyle::default_spinner().template("{prefix:>12.bold.cyan} {spinner} {msg}"));
+                bar.println(success("Downloaded", format_args!("{} {}", version.name(), version.version())));
+                bar.set_prefix("Verifying");
+                bar.set_message("checksum");
                 let calculated_checksum = sha2::Sha256::digest(&data);
                 if calculated_checksum.as_slice() != version.checksum() {
                     fehler::throw!(anyhow!("invalid checksum, expected {} but got {}", hex::encode(version.checksum()), hex::encode(calculated_checksum)));
                 }
                 tracing::debug!("verified checksum ({})", hex::encode(version.checksum()));
+                self.slow();
+                bar.println(success("Verified", "checksum"));
 
                 if self.extract {
+                    bar.set_prefix("Extracting");
+                    bar.set_message(format!("{} {} to {}", version.name(), version.version(), output));
                     let archive = tar::Archive::new(flate2::bufread::GzDecoder::new(std::io::Cursor::new(data)));
                     unpack::unpack(version, archive, &output)?;
-                    bar.println(format!("{} {} extracted to {}", version.name(), version.version(), output));
+                    self.slow();
+                    bar.println(success("Extracted", format_args!("{} {} to {}", version.name(), version.version(), output)));
                 } else {
+                    bar.set_prefix("Writing");
+                    bar.set_message(format!("{} {} to {}", version.name(), version.version(), output));
                     std::fs::write(&output, data)?;
-                    bar.println(format!("{} {} written to {}", version.name(), version.version(), output));
+                    self.slow();
+                    bar.println(success("Written", format_args!("{} {} to {}", version.name(), version.version(), output)));
                 }
             }
         }
+        bar.finish_and_clear();
     }
 }
 
