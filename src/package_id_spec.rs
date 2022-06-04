@@ -38,9 +38,10 @@ impl std::str::FromStr for PackageIdSpec {
 impl std::fmt::Display for PackageIdSpec {
     #[fehler::throws(std::fmt::Error)]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) {
-        write!(f, "{}", self.name)?;
-        if let Some(version_req) = &self.version_req {
-            write!(f, "@{}", version_req)?;
+        if let PackageIdSpec { name, version_req: Some(version_req) } = self {
+            f.pad(&format!("{name}@{version_req}"))?;
+        } else {
+            write!(f, "{}", self.name)?;
         }
     }
 }

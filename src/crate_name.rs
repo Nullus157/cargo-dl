@@ -23,6 +23,6 @@ impl std::str::FromStr for CrateName {
 impl std::fmt::Display for CrateName {
     #[fehler::throws(std::fmt::Error)]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) {
-        write!(f, "{}", self.0)?;
+        f.pad(&self.0)?;
     }
 }
