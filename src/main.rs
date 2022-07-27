@@ -55,6 +55,10 @@ struct App {
     #[clap(long)]
     allow_yanked: bool,
 
+    /// Disable checking cargo cache for the crate file.
+    #[clap(long = "no-cache", action(clap::ArgAction::SetFalse))]
+    cache: bool,
+
     /// Slow down operations for manually testing UI
     #[clap(long, hide = true)]
     slooooow: bool,
@@ -179,15 +183,21 @@ impl App {
 
                     let version_str = stylish::format!("{:(fg=magenta)} {:(fg=magenta)}", version.name(), version.version());
 
-                    bar.set_message(stylish::ansi::format!("checking cache for {:s}", version_str));
-                    self.slow();
-
                     let output = self.output.clone().unwrap_or_else(|| if self.extract {
                         format!("{}-{}", version.name(), version.version())
                     } else {
                         format!("{}-{}.crate", version.name(), version.version())
                     });
-                    match cache::lookup(&index, version) {
+
+                    let cached = if self.cache {
+                        bar.set_message(stylish::ansi::format!("checking cache for {:s}", version_str));
+                        self.slow();
+                        cache::lookup(&index, version)
+                    } else {
+                        Err(anyhow!("cache disabled by flag"))
+                    };
+
+                    match cached {
                         Ok(path) => {
                             tracing::debug!("found cached crate for {} {} at {}", version.name(), version.version(), path.display());
                             if self.extract {

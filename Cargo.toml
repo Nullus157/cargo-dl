@@ -5,7 +5,7 @@ edition = "2021"
 
 [dependencies]
 anyhow = { version = "1.0.56", default-features = false, features = ["std"] }
-clap = { version = "=3.0.0-rc.11", default-features = false, features = ["std", "derive", "color"] }
+clap = { version = "3.2.14", default-features = false, features = ["std", "derive", "color"] }
 crates-index = { version = "0.18.2", default-features = false }
 displaydoc = { version = "0.2.3", default-features = false }
 fehler = { version = "1.0.0", default-features = false }
