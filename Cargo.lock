@@ -40,8 +40,9 @@ checksum = "08f9b8508dccb7687a1d6c4ce66b2b0ecef467c94667de27d8d7fe1f8d2a9cdc"
 
 [[package]]
 name = "askama_escape"
-version = "0.10.1"
-source = "git+https://github.com/Nemo157/askama?branch=askama_escape-no_std#dfe705cb16de5f6cf04a8eb8db6896c848255669"
+version = "0.10.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "619743e34b5ba4e9703bba34deac3427c72507c7159f5fd030aea8cac0cfe341"
 
 [[package]]
 name = "atty"
@@ -816,7 +817,8 @@ checksum = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"
 [[package]]
 name = "stylish"
 version = "0.1.0"
-source = "git+https://github.com/Nemo157/stylish-rs#10910aade11e29935bee004e8d5f11f2a129bc3b"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "710f2c9095b174380f32dd64fc3cde156d47467f4a4ebcc80e9795337658c13f"
 dependencies = [
  "stylish-ansi",
  "stylish-core",
@@ -828,7 +830,8 @@ dependencies = [
 [[package]]
 name = "stylish-ansi"
 version = "0.1.0"
-source = "git+https://github.com/Nemo157/stylish-rs#10910aade11e29935bee004e8d5f11f2a129bc3b"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "703b5d4d917155d0e52dbb7e389801201840b182971c40e8283f045eb735fcec"
 dependencies = [
  "stylish-core",
 ]
@@ -836,17 +839,20 @@ dependencies = [
 [[package]]
 name = "stylish-core"
 version = "0.1.0"
-source = "git+https://github.com/Nemo157/stylish-rs#10910aade11e29935bee004e8d5f11f2a129bc3b"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a5ccb13f18c67d70e630ad63b3130a3796369eea6e5ff3b4f570d050ef39d6a9"
 dependencies = [
  "stack_dst",
  "stylish-macros",
+ "stylish-style",
  "with_builtin_macros",
 ]
 
 [[package]]
 name = "stylish-html"
 version = "0.1.0"
-source = "git+https://github.com/Nemo157/stylish-rs#10910aade11e29935bee004e8d5f11f2a129bc3b"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a6f6c469d29177338d6518dee45161fad68f54a79bd13a2d9472aea982435aae"
 dependencies = [
  "askama_escape",
  "stylish-core",
@@ -855,21 +861,30 @@ dependencies = [
 [[package]]
 name = "stylish-macros"
 version = "0.1.0"
-source = "git+https://github.com/Nemo157/stylish-rs#10910aade11e29935bee004e8d5f11f2a129bc3b"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cbf75ff76a3f12c05581e4542c34bee55dcf1b175aa9b62cadee27565b72c354"
 dependencies = [
  "nom",
  "proc-macro2",
  "quote",
+ "stylish-style",
  "syn",
 ]
 
 [[package]]
 name = "stylish-plain"
 version = "0.1.0"
-source = "git+https://github.com/Nemo157/stylish-rs#10910aade11e29935bee004e8d5f11f2a129bc3b"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f8555222f71dedeab27e00210df32feb9ee02f48946b0a7d229b842af23da228"
 dependencies = [
  "stylish-core",
 ]
+
+[[package]]
+name = "stylish-style"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "33cf64052757efa49a6a83d5d1401b3283a1bccb1168e26e3ee0e4c1c1630779"
 
 [[package]]
 name = "syn"
