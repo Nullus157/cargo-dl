@@ -19,11 +19,11 @@ const DOWNLOAD_TEMPLATE: &str = "{prefix:>40.cyan} {spinner} {msg}
                                    [{bar:27}] {bytes:>9}/{total_bytes:9}  {bytes_per_sec} {elapsed:>4}/{eta:4}";
 
 #[derive(Debug, Parser)]
-#[clap(bin_name = "cargo", version, about)]
+#[clap(bin_name = "cargo", version)]
 #[clap(global_setting(clap::AppSettings::DisableHelpSubcommand))]
 #[clap(global_setting(clap::AppSettings::PropagateVersion))]
 enum Command {
-    /// Cargo subcommand for downloading crate sources
+    #[clap(about)]
     Dl(App),
 }
 
