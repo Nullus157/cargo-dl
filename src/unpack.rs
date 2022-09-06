@@ -9,7 +9,7 @@ pub(crate) fn unpack(
 ) {
     let base = format!("{}-{}", version.name(), version.version());
     let output = output.as_ref();
-    std::fs::create_dir_all(&output)?;
+    std::fs::create_dir_all(output)?;
     let mut entries = archive.entries()?;
     while let Some(mut entry) = entries.next().transpose()? {
         let path = entry.path()?;
