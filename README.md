@@ -3,6 +3,9 @@
 Cargo subcommand for downloading crate sources
 
 ```
+cargo-dl 0.1.0
+Cargo subcommand for downloading crate sources
+
 USAGE:
     cargo dl [OPTIONS] <CRATE[@VERSION_REQ]>...
 
@@ -19,13 +22,6 @@ OPTIONS:
         --allow-yanked
             Allow yanked versions to be chosen
 
-    -e, --extract
-            Specify this flag to have the crate extracted automatically.
-
-            Note that unless changed via the --output flag, this will extract
-            the files to a new subdirectory bearing the name of the downloaded
-            crate archive.
-
     -h, --help
             Print help information
 
@@ -40,6 +36,13 @@ OPTIONS:
 
     -V, --version
             Print version information
+
+    -x, --extract
+            Specify this flag to have the crate extracted automatically.
+
+            Note that unless changed via the --output flag, this will extract
+            the files to a new subdirectory bearing the name of the downloaded
+            crate archive.
 ```
 
 
@@ -69,4 +72,3 @@ at your option.
 Unless you explicitly state otherwise, any contribution intentionally submitted
 for inclusion in the work by you shall be dual licensed as above, without any
 additional terms or conditions.
-

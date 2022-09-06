@@ -33,7 +33,7 @@ struct App {
     ///
     /// Note that unless changed via the --output flag, this will extract the files to a new
     /// subdirectory bearing the name of the downloaded crate archive.
-    #[clap(short, long)]
+    #[clap(short = 'x', short_alias = 'e', long)]
     extract: bool,
 
     /// Normally, the compressed crate is written to a file (or directory if --extract is used)
