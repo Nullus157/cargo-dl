@@ -1,0 +1,23 @@
+[advisories]
+ignore = [
+  # https://github.com/tokio-rs/tracing/issues/2282
+  "RUSTSEC-2021-0139",
+]
+
+[licenses]
+allow = [
+  "ISC",
+  "MIT",
+  "MPL-2.0",
+  "BSD-3-Clause",
+  "Apache-2.0",
+  "Unicode-DFS-2016",
+  "OpenSSL",
+]
+
+[[licenses.clarify]]
+name = "ring"
+expression = "MIT AND ISC AND OpenSSL"
+license-files = [
+  { path = "LICENSE", hash = 0xbd0eed23 },
+]
