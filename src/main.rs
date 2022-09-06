@@ -1,13 +1,13 @@
+mod cache;
 mod crate_name;
 mod package_id_spec;
-mod cache;
 mod unpack;
 
-use std::io::Read;
+use crate::{crate_name::CrateName, package_id_spec::PackageIdSpec};
 use anyhow::{anyhow, Context, Error};
 use clap::Parser;
+use std::io::Read;
 use tracing_subscriber::EnvFilter;
-use crate::{package_id_spec::PackageIdSpec, crate_name::CrateName};
 
 const USER_AGENT: &str = concat!("cargo-dl/", env!("CARGO_PKG_VERSION"));
 const CRATE_SIZE_LIMIT: u64 = 40 * 1024 * 1024;
@@ -83,17 +83,22 @@ impl App {
         }
 
         let bars: &indicatif::MultiProgress = Box::leak(Box::new(indicatif::MultiProgress::new()));
-        let spawning: &std::sync::atomic::AtomicBool = Box::leak(Box::new(std::sync::atomic::AtomicBool::new(true)));
+        let spawning: &std::sync::atomic::AtomicBool =
+            Box::leak(Box::new(std::sync::atomic::AtomicBool::new(true)));
         let thread = std::thread::spawn(move || {
             let mut index = crates_index::Index::new_cargo_default()?;
-            let bar = bars.add(indicatif::ProgressBar::new_spinner()).with_style(indicatif::ProgressStyle::default_spinner().template(SPINNER_TEMPLATE))
+            let bar = bars
+                .add(indicatif::ProgressBar::new_spinner())
+                .with_style(indicatif::ProgressStyle::default_spinner().template(SPINNER_TEMPLATE))
                 .with_prefix("crates.io index")
-            .with_message("updating");
+                .with_message("updating");
             bar.enable_steady_tick(100);
             index.update()?;
             self.slow();
 
-            bar.set_style(indicatif::ProgressStyle::default_spinner().template(SUCCESS_SPINNER_TEMPLATE));
+            bar.set_style(
+                indicatif::ProgressStyle::default_spinner().template(SUCCESS_SPINNER_TEMPLATE),
+            );
             bar.finish_with_message("updated");
 
             let threads = Vec::from_iter(self.specs.iter().map(|spec| {
@@ -291,7 +296,7 @@ impl App {
                             } else {
                                 fehler::throw!(e.context(format!("could not acquire {}", spec)));
                             }
-                        },
+                        }
                         Err(e) => std::panic::resume_unwind(e),
                     }
                 }
@@ -344,15 +349,9 @@ fn get_env_directive(var: &str) -> Option<tracing_subscriber::filter::Directive>
 fn env_filter() -> (EnvFilter, Option<anyhow::Error>) {
     let filter = EnvFilter::new("INFO");
     match get_env_directive("CARGO_DL_LOG") {
-        Ok(Some(directive)) => {
-            (filter.add_directive(directive), None)
-        }
-        Ok(None) => {
-            (filter, None)
-        }
-        Err(err) => {
-            (filter, Some(err.context("failed to apply log directive")))
-        }
+        Ok(Some(directive)) => (filter.add_directive(directive), None),
+        Ok(None) => (filter, None),
+        Err(err) => (filter, Some(err.context("failed to apply log directive"))),
     }
 }
 
@@ -369,7 +368,12 @@ fn main() {
     }
     match Command::try_parse() {
         Ok(Command::Dl(app)) => Box::leak(Box::new(app)).run()?,
-        Err(e @ clap::Error { kind: clap::ErrorKind::ValueValidation, .. }) => {
+        Err(
+            e @ clap::Error {
+                kind: clap::ErrorKind::ValueValidation,
+                ..
+            },
+        ) => {
             use std::error::Error;
             println!("Error: invalid value for {}", e.info[0]);
             println!();

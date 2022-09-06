@@ -1,4 +1,3 @@
-
 #[derive(Clone, Debug)]
 pub(crate) struct CrateName(pub(crate) String);
 
@@ -13,7 +12,11 @@ impl std::str::FromStr for CrateName {
 
     #[fehler::throws(ParseError)]
     fn from_str(s: &str) -> Self {
-        if let Some((index, char)) = s.chars().enumerate().find(|(_, c)| !c.is_alphanumeric() && !['-', '_'].contains(c)) {
+        if let Some((index, char)) = s
+            .chars()
+            .enumerate()
+            .find(|(_, c)| !c.is_alphanumeric() && !['-', '_'].contains(c))
+        {
             fehler::throw!(ParseError::InvalidCharacter(char, index));
         }
         CrateName(s.to_owned())
