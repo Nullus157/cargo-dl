@@ -20,6 +20,7 @@ semver = { version = "1.0.4", default-features = false }
 sha2 = { version = "0.10.1", default-features = false, features = ["std"] }
 stylish = { version = "0.1.0", default-features = false, features = ["std", "ansi", "macros"] }
 tar = { version = "0.4.38", default-features = false }
+terminal_size = { version = "0.2.1", default-features = false }
 thiserror = { version = "1.0.30", default-features = false }
 tracing = { version = "0.1.29", default-features = false, features = ["attributes", "std"] }
 tracing-subscriber = { version = "0.3.5", default-features = false, features = ["env-filter", "fmt", "ansi", "tracing-log"] }
