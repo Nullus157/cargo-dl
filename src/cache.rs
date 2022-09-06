@@ -1,6 +1,6 @@
-use std::path::PathBuf;
 use anyhow::{anyhow, Context, Error};
 use crates_index::{Index, Version};
+use std::path::PathBuf;
 
 #[fehler::throws]
 #[fn_error_context::context("hashing {}", path.as_ref().display())]
@@ -60,12 +60,19 @@ pub(crate) fn lookup(index: &Index, version: &Version) -> PathBuf {
 
     let cache_file = cache_dir.join(format!("{}-{}.crate", version.name(), version.version()));
     if !cache_file.exists() {
-        fehler::throw!(anyhow!("cache file {} does not exist", cache_file.display()));
+        fehler::throw!(anyhow!(
+            "cache file {} does not exist",
+            cache_file.display()
+        ));
     }
 
     let calculated_checksum = sha256_file(&cache_file)?;
     if &calculated_checksum != version.checksum() {
-        fehler::throw!(anyhow!("invalid checksum, expected {} but got {}", hex::encode(version.checksum()), hex::encode(calculated_checksum)));
+        fehler::throw!(anyhow!(
+            "invalid checksum, expected {} but got {}",
+            hex::encode(version.checksum()),
+            hex::encode(calculated_checksum)
+        ));
     }
 
     cache_file
