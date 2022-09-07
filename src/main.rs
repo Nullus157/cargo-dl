@@ -5,7 +5,7 @@ mod unpack;
 
 use crate::{crate_name::CrateName, package_id_spec::PackageIdSpec};
 use anyhow::{anyhow, Context, Error};
-use clap::Parser;
+use clap::{CommandFactory, FromArgMatches, Parser};
 use std::io::Read;
 use tracing_subscriber::EnvFilter;
 
@@ -33,7 +33,7 @@ struct App {
     ///
     /// Note that unless changed via the --output flag, this will extract the files to a new
     /// subdirectory bearing the name of the downloaded crate archive.
-    #[clap(short, long)]
+    #[clap(short = 'x', short_alias = 'e', long)]
     extract: bool,
 
     /// Normally, the compressed crate is written to a file (or directory if --extract is used)
@@ -366,7 +366,19 @@ fn main() {
     if let Some(err) = err {
         tracing::warn!("{err:?}");
     }
-    match Command::try_parse() {
+
+    let mut command = Command::command();
+
+    if terminal_size::terminal_size().is_none() {
+        if let Some(width) = std::env::var("COLUMNS").ok().and_then(|s| s.parse().ok()) {
+            command = command.term_width(width);
+        }
+    }
+
+    match command
+        .try_get_matches()
+        .and_then(|m| Command::from_arg_matches(&m))
+    {
         Ok(Command::Dl(app)) => Box::leak(Box::new(app)).run()?,
         Err(
             e @ clap::Error {

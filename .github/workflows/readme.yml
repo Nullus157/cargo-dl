@@ -1,0 +1,13 @@
+jobs:
+  readme:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - run: sudo apt install -y ripgrep
+    - run: |
+        expected="$(COLUMNS=80 cargo run -q -- dl --help | sed -E -e 's/ *$//')"
+        echo "$expected"
+        rg -FUq "$expected" README.md
+
+on:
+  workflow_call:

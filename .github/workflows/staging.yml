@@ -3,9 +3,11 @@ jobs:
     uses: Nullus157/.github/.github/workflows/pull_request.yml@prīmum
   staging:
     uses: Nullus157/.github/.github/workflows/staging.yml@prīmum
+  readme:
+    uses: ./.github/workflows/readme.yml
   success:
     runs-on: ubuntu-latest
-    needs: [pull_request, staging]
+    needs: [pull_request, staging, readme]
     steps:
     - run: true
 
