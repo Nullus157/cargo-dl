@@ -7,21 +7,21 @@ repository = "https://github.com/Nullus157/cargo-dl"
 license = "MIT OR Apache-2.0"
 
 [dependencies]
-anyhow = { version = "1.0.56", default-features = false, features = ["std"] }
-clap = { version = "3.2.14", default-features = false, features = ["std", "derive", "color", "wrap_help"] }
-crates-index = { version = "0.18.2", default-features = false }
-displaydoc = { version = "0.2.3", default-features = false }
+anyhow = { version = "1.0.71", default-features = false, features = ["std"] }
+clap = { version = "4.3.0", default-features = false, features = ["std", "derive", "color", "wrap_help", "error-context", "cargo", "suggestions", "usage"] }
+crates-index = { version = "0.19.10", default-features = false }
+displaydoc = { version = "0.2.4", default-features = false }
 fehler = { version = "1.0.0", default-features = false }
-flate2 = { version = "1.0.24", default-features = false, features = ["rust_backend"] }
-fn-error-context = { version = "0.2.0", default-features = false }
+flate2 = { version = "1.0.26", default-features = false, features = ["rust_backend"] }
+fn-error-context = { version = "0.2.1", default-features = false }
 hex = { version = "0.4.3", default-features = false }
-indicatif = { version = "0.16.2", default-features = false }
-semver = { version = "1.0.4", default-features = false }
-sha2 = { version = "0.10.1", default-features = false, features = ["std"] }
+indicatif = { version = "0.17.3", default-features = false }
+semver = { version = "1.0.17", default-features = false }
+sha2 = { version = "0.10.6", default-features = false, features = ["std"] }
 stylish = { version = "0.1.0", default-features = false, features = ["std", "ansi", "macros"] }
 tar = { version = "0.4.38", default-features = false }
-terminal_size = { version = "0.2.1", default-features = false }
-thiserror = { version = "1.0.30", default-features = false }
-tracing = { version = "0.1.29", default-features = false, features = ["attributes", "std"] }
-tracing-subscriber = { version = "0.3.5", default-features = false, features = ["env-filter", "fmt", "ansi", "tracing-log"] }
-ureq = { version = "2.4.0", default-features = false, features = ["gzip", "brotli", "tls"] }
+terminal_size = { version = "0.2.6", default-features = false }
+thiserror = { version = "1.0.40", default-features = false }
+tracing = { version = "0.1.37", default-features = false, features = ["attributes", "std"] }
+tracing-subscriber = { version = "0.3.17", default-features = false, features = ["env-filter", "fmt", "ansi", "tracing-log"] }
+ureq = { version = "2.6.2", default-features = false, features = ["gzip", "brotli", "tls"] }

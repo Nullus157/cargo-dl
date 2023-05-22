@@ -6,24 +6,22 @@ mod unpack;
 use crate::{crate_name::CrateName, package_id_spec::PackageIdSpec};
 use anyhow::{anyhow, Context, Error};
 use clap::{CommandFactory, FromArgMatches, Parser};
-use std::io::Read;
+use std::{io::Read, time::Duration};
 use tracing_subscriber::EnvFilter;
 
 const USER_AGENT: &str = concat!("cargo-dl/", env!("CARGO_PKG_VERSION"));
 const CRATE_SIZE_LIMIT: u64 = 40 * 1024 * 1024;
 
-const SPINNER_TEMPLATE: &str = "{prefix:>40.cyan} {spinner} {msg}";
-const SUCCESS_SPINNER_TEMPLATE: &str = "{prefix:>40.green} {spinner} {msg}";
-const FAILURE_SPINNER_TEMPLATE: &str = "{prefix:>40.red} {spinner} {msg}";
-const DOWNLOAD_TEMPLATE: &str = "{prefix:>40.cyan} {spinner} {msg}
-                                   [{bar:27}] {bytes:>9}/{total_bytes:9}  {bytes_per_sec} {elapsed:>4}/{eta:4}";
-
 #[derive(Debug, Parser)]
-#[clap(bin_name = "cargo", version)]
-#[clap(global_setting(clap::AppSettings::DisableHelpSubcommand))]
-#[clap(global_setting(clap::AppSettings::PropagateVersion))]
+#[command(
+    bin_name = "cargo",
+    display_name = "cargo",
+    version,
+    disable_help_subcommand = true,
+    propagate_version = true
+)]
 enum Command {
-    #[clap(about)]
+    #[command(about)]
     Dl(App),
 }
 
@@ -33,13 +31,13 @@ struct App {
     ///
     /// Note that unless changed via the --output flag, this will extract the files to a new
     /// subdirectory bearing the name of the downloaded crate archive.
-    #[clap(short = 'x', short_alias = 'e', long)]
+    #[arg(short = 'x', short_alias = 'e', long)]
     extract: bool,
 
     /// Normally, the compressed crate is written to a file (or directory if --extract is used)
     /// based on its name and version.  This flag allows to change that by providing an explicit
     /// file or directory path. (Only when downloading a single crate).
-    #[clap(short, long)]
+    #[arg(short, long)]
     output: Option<String>,
 
     // TODO: Easy way to download latest pre-release
@@ -48,19 +46,19 @@ struct App {
     /// Optionally including which version of the crate to download after `@`, in the standard
     /// semver constraint format used in Cargo.toml. If unspecified the newest non-prerelease,
     /// non-yanked version will be fetched.
-    #[clap(name = "CRATE[@VERSION_REQ]", required = true)]
+    #[arg(name = "CRATE[@VERSION_REQ]", required = true)]
     specs: Vec<PackageIdSpec>,
 
     /// Allow yanked versions to be chosen.
-    #[clap(long)]
+    #[arg(long)]
     allow_yanked: bool,
 
     /// Disable checking cargo cache for the crate file.
-    #[clap(long = "no-cache", action(clap::ArgAction::SetFalse))]
+    #[arg(long = "no-cache", action(clap::ArgAction::SetFalse))]
     cache: bool,
 
     /// Slow down operations for manually testing UI
-    #[clap(long, hide = true)]
+    #[arg(long, hide = true)]
     slooooow: bool,
 }
 
@@ -71,7 +69,7 @@ struct LoggedError;
 impl App {
     fn slow(&self) {
         if self.slooooow {
-            std::thread::sleep(std::time::Duration::from_secs(2));
+            std::thread::sleep(Duration::from_secs(2));
         }
     }
 
@@ -82,39 +80,50 @@ impl App {
             fehler::throw!(anyhow!("cannot use --output with multiple crates"));
         }
 
+        let spinner_style = Box::leak(Box::new(
+            indicatif::ProgressStyle::default_bar()
+                .template("{prefix:>40.cyan} {spinner} {msg}")?,
+        ));
+        let success_style = Box::leak(Box::new(
+            indicatif::ProgressStyle::default_bar()
+                .template("{prefix:>40.green} {spinner} {msg}")?,
+        ));
+        let failure_style = Box::leak(Box::new(
+            indicatif::ProgressStyle::default_bar().template("{prefix:>40.red} {spinner} {msg}")?,
+        ));
+        let download_style = Box::leak(Box::new(indicatif::ProgressStyle::default_bar().template("{prefix:>40.cyan} {spinner} {msg}
+                                   [{bar:27}] {bytes:>9}/{total_bytes:9}  {bytes_per_sec} {elapsed:>4}/{eta:4}")?));
+
         let bars: &indicatif::MultiProgress = Box::leak(Box::new(indicatif::MultiProgress::new()));
-        let spawning: &std::sync::atomic::AtomicBool =
-            Box::leak(Box::new(std::sync::atomic::AtomicBool::new(true)));
         let thread = std::thread::spawn(move || {
             let mut index = crates_index::Index::new_cargo_default()?;
             let bar = bars
                 .add(indicatif::ProgressBar::new_spinner())
-                .with_style(indicatif::ProgressStyle::default_spinner().template(SPINNER_TEMPLATE))
+                .with_style(spinner_style.clone())
                 .with_prefix("crates.io index")
                 .with_message("updating");
-            bar.enable_steady_tick(100);
+            bar.enable_steady_tick(Duration::from_millis(100));
             index.update()?;
             self.slow();
 
-            bar.set_style(
-                indicatif::ProgressStyle::default_spinner().template(SUCCESS_SPINNER_TEMPLATE),
-            );
+            bar.set_style(success_style.clone());
             bar.finish_with_message("updated");
 
             let threads = Vec::from_iter(self.specs.iter().map(|spec| {
-                let bar = bars.add(indicatif::ProgressBar::new_spinner()).with_style(indicatif::ProgressStyle::default_spinner().template(SPINNER_TEMPLATE));
-                (spec, std::thread::spawn(move || {
+                let bar = bars.add(indicatif::ProgressBar::new_spinner()).with_style(spinner_style.clone());
+                (spec, std::thread::spawn(|| {
+                    let bar = bar;
                     bar.tick();
                     bar.set_prefix(spec.to_string());
                     let index = crates_index::Index::new_cargo_default()?;
                     bar.set_message("selecting version");
-                    bar.enable_steady_tick(100);
+                    bar.enable_steady_tick(Duration::from_millis(100));
                     self.slow();
                     // TODO: fuzzy name matching https://github.com/frewsxcv/rust-crates-index/issues/75
                     let krate = match index.crate_(&spec.name.0) {
                         Some(krate) => krate,
                         None => {
-                            bar.set_style(indicatif::ProgressStyle::default_spinner().template(FAILURE_SPINNER_TEMPLATE));
+                            bar.set_style(failure_style.clone());
                             bar.finish_with_message("could not find crate in the index");
                             return Err(LoggedError.into());
                         }
@@ -180,7 +189,7 @@ impl App {
                                 use std::fmt::Write;
                                 write!(msg, "; the yanked version {} {} matched, use `--allow-yanked` to download it", version.name(), version.version())?;
                             }
-                            bar.set_style(indicatif::ProgressStyle::default_spinner().template(FAILURE_SPINNER_TEMPLATE));
+                            bar.set_style(failure_style.clone());
                             bar.finish_with_message(msg);
                             return Err(LoggedError.into());
                         }
@@ -210,17 +219,17 @@ impl App {
                                 let file = std::fs::File::open(path)?;
                                 bar.reset();
                                 bar.set_length(file.metadata()?.len());
-                                bar.set_style(indicatif::ProgressStyle::default_bar().template(DOWNLOAD_TEMPLATE));
+                                bar.set_style(download_style.clone());
                                 let archive = tar::Archive::new(flate2::bufread::GzDecoder::new(bar.wrap_read(std::io::BufReader::new(file))));
                                 unpack::unpack(version, archive, &output)?;
                                 self.slow();
-                                bar.set_style(indicatif::ProgressStyle::default_spinner().template(SUCCESS_SPINNER_TEMPLATE));
+                                bar.set_style(success_style.clone());
                                 bar.finish_with_message(stylish::ansi::format!("extracted {:s} to {:(fg=blue)}", version_str, output));
                             } else {
                                 bar.set_message(stylish::ansi::format!("writing {:s} to {:(fg=blue)}", version_str, output));
                                 self.slow();
                                 std::fs::copy(path, &output)?;
-                                bar.set_style(indicatif::ProgressStyle::default_spinner().template(SUCCESS_SPINNER_TEMPLATE));
+                                bar.set_style(success_style.clone());
                                 bar.finish_with_message(stylish::ansi::format!("written {:s} to {:(fg=blue)}", version_str, output));
                             }
                         }
@@ -235,19 +244,19 @@ impl App {
                                 data = Vec::with_capacity(len);
                                 bar.reset();
                                 bar.set_length(u64::try_from(len)?);
-                                bar.set_style(indicatif::ProgressStyle::default_bar().template(DOWNLOAD_TEMPLATE));
+                                bar.set_style(download_style.clone());
                             } else {
                                 data = Vec::with_capacity(usize::try_from(CRATE_SIZE_LIMIT)?);
                             }
                             bar.wrap_read(resp.into_reader()).take(CRATE_SIZE_LIMIT).read_to_end(&mut data)?;
                             self.slow();
                             tracing::debug!("downloaded {} {} ({} bytes)", version.name(), version.version(), data.len());
-                            bar.set_style(indicatif::ProgressStyle::default_spinner().template(SPINNER_TEMPLATE));
+                            bar.set_style(spinner_style.clone());
                             bar.set_message(stylish::ansi::format!("verifying checksum of {:s}", version_str));
                             let calculated_checksum = sha2::Sha256::digest(&data);
                             if calculated_checksum.as_slice() != version.checksum() {
                                 tracing::debug!("invalid checksum, expected {} but got {}", hex::encode(version.checksum()), hex::encode(calculated_checksum));
-                                bar.set_style(indicatif::ProgressStyle::default_spinner().template(FAILURE_SPINNER_TEMPLATE));
+                                bar.set_style(failure_style.clone());
                                 bar.finish_with_message("invalid checksum");
                                 return Err(LoggedError.into());
                             }
@@ -258,17 +267,17 @@ impl App {
                                 bar.set_message(stylish::ansi::format!("extracting {:s} to {:(fg=blue)}", version_str, output));
                                 bar.reset();
                                 bar.set_length(u64::try_from(data.len())?);
-                                bar.set_style(indicatif::ProgressStyle::default_bar().template(DOWNLOAD_TEMPLATE));
+                                bar.set_style(download_style.clone());
                                 let archive = tar::Archive::new(flate2::bufread::GzDecoder::new(bar.wrap_read(std::io::Cursor::new(data))));
                                 unpack::unpack(version, archive, &output)?;
                                 self.slow();
-                                bar.set_style(indicatif::ProgressStyle::default_spinner().template(SUCCESS_SPINNER_TEMPLATE));
+                                bar.set_style(success_style.clone());
                                 bar.finish_with_message(stylish::ansi::format!("extracted {:s} to {:(fg=blue)}", version_str, output));
                             } else {
                                 bar.set_message(stylish::ansi::format!("writing {:s} to {:(fg=blue)}", version_str, output));
                                 std::fs::write(&output, data)?;
                                 self.slow();
-                                bar.set_style(indicatif::ProgressStyle::default_spinner().template(SUCCESS_SPINNER_TEMPLATE));
+                                bar.set_style(success_style.clone());
                                 bar.finish_with_message(stylish::ansi::format!("written {:s} to {:(fg=blue)}", version_str, output));
                             }
                         }
@@ -276,14 +285,8 @@ impl App {
                     Result::<(), anyhow::Error>::Ok(())
                 }))
             }));
-            spawning.store(false, std::sync::atomic::Ordering::SeqCst);
             Result::<_, anyhow::Error>::Ok(threads)
         });
-        // Need to ensure all bars have been added before we stop trying to render the
-        // multi-progress bar
-        while spawning.load(std::sync::atomic::Ordering::SeqCst) {
-            bars.join()?;
-        }
         let mut logged_error = false;
         match thread.join() {
             Ok(threads) => {
@@ -380,14 +383,12 @@ fn main() {
         .and_then(|m| Command::from_arg_matches(&m))
     {
         Ok(Command::Dl(app)) => Box::leak(Box::new(app)).run()?,
-        Err(
-            e @ clap::Error {
-                kind: clap::ErrorKind::ValueValidation,
-                ..
-            },
-        ) => {
+        Err(e) if e.kind() == clap::error::ErrorKind::ValueValidation => {
+            use clap::error::{ContextKind, ContextValue};
             use std::error::Error;
-            println!("Error: invalid value for {}", e.info[0]);
+            let Some(ContextValue::String(name)) = e.get(ContextKind::InvalidArg) else { e.exit() };
+            let Some(ContextValue::String(value)) = e.get(ContextKind::InvalidValue) else { e.exit() };
+            println!("Error: invalid value '{value}' for {name}");
             println!();
             if let Some(source) = e.source() {
                 println!("Caused by:");
