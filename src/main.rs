@@ -57,6 +57,11 @@ struct App {
     #[arg(long = "no-cache", action(clap::ArgAction::SetFalse))]
     cache: bool,
 
+    /// Disable updating the cargo index before downloading (if out of date you may not download
+    /// the latest matching version)
+    #[clap(long = "no-index-update", action(clap::ArgAction::SetFalse))]
+    update_index: bool,
+
     /// Slow down operations for manually testing UI
     #[arg(long, hide = true)]
     slooooow: bool,
@@ -97,17 +102,19 @@ impl App {
         let bars: &indicatif::MultiProgress = Box::leak(Box::new(indicatif::MultiProgress::new()));
         let thread = std::thread::spawn(move || {
             let mut index = crates_index::Index::new_cargo_default()?;
-            let bar = bars
-                .add(indicatif::ProgressBar::new_spinner())
-                .with_style(spinner_style.clone())
-                .with_prefix("crates.io index")
-                .with_message("updating");
-            bar.enable_steady_tick(Duration::from_millis(100));
-            index.update()?;
-            self.slow();
+            if self.update_index {
+                let bar = bars
+                    .add(indicatif::ProgressBar::new_spinner())
+                    .with_style(spinner_style.clone())
+                    .with_prefix("crates.io index")
+                    .with_message("updating");
+                bar.enable_steady_tick(Duration::from_millis(100));
+                index.update()?;
+                self.slow();
 
-            bar.set_style(success_style.clone());
-            bar.finish_with_message("updated");
+                bar.set_style(success_style.clone());
+                bar.finish_with_message("updated");
+            }
 
             let threads = Vec::from_iter(self.specs.iter().map(|spec| {
                 let bar = bars.add(indicatif::ProgressBar::new_spinner()).with_style(spinner_style.clone());

@@ -36,6 +36,10 @@ Options:
       --no-cache
           Disable checking cargo cache for the crate file
 
+      --no-index-update
+          Disable updating the cargo index before downloading (if out of date
+          you may not download the latest matching version)
+
   -h, --help
           Print help (see a summary with '-h')
 
