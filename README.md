@@ -3,46 +3,44 @@
 Cargo subcommand for downloading crate sources
 
 ```
-cargo-dl 0.1.0
 Cargo subcommand for downloading crate sources
 
-USAGE:
-    cargo dl [OPTIONS] <CRATE[@VERSION_REQ]>...
+Usage: cargo dl [OPTIONS] <CRATE[@VERSION_REQ]>...
 
-ARGS:
-    <CRATE[@VERSION_REQ]>...
-            The crate(s) to download.
+Arguments:
+  <CRATE[@VERSION_REQ]>...
+          The crate(s) to download.
 
-            Optionally including which version of the crate to download after
-            `@`, in the standard semver constraint format used in Cargo.toml. If
-            unspecified the newest non-prerelease, non-yanked version will be
-            fetched.
+          Optionally including which version of the crate to download after `@`,
+          in the standard semver constraint format used in Cargo.toml. If
+          unspecified the newest non-prerelease, non-yanked version will be
+          fetched.
 
-OPTIONS:
-        --allow-yanked
-            Allow yanked versions to be chosen
+Options:
+  -x, --extract
+          Specify this flag to have the crate extracted automatically.
 
-    -h, --help
-            Print help information
+          Note that unless changed via the --output flag, this will extract the
+          files to a new subdirectory bearing the name of the downloaded crate
+          archive.
 
-        --no-cache
-            Disable checking cargo cache for the crate file
+  -o, --output <OUTPUT>
+          Normally, the compressed crate is written to a file (or directory if
+          --extract is used) based on its name and version.  This flag allows to
+          change that by providing an explicit file or directory path. (Only
+          when downloading a single crate)
 
-    -o, --output <OUTPUT>
-            Normally, the compressed crate is written to a file (or directory if
-            --extract is used) based on its name and version.  This flag allows
-            to change that by providing an explicit file or directory path.
-            (Only when downloading a single crate)
+      --allow-yanked
+          Allow yanked versions to be chosen
 
-    -V, --version
-            Print version information
+      --no-cache
+          Disable checking cargo cache for the crate file
 
-    -x, --extract
-            Specify this flag to have the crate extracted automatically.
+  -h, --help
+          Print help (see a summary with '-h')
 
-            Note that unless changed via the --output flag, this will extract
-            the files to a new subdirectory bearing the name of the downloaded
-            crate archive.
+  -V, --version
+          Print version
 ```
 
 
