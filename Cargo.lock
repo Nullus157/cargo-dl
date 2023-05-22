@@ -140,6 +140,7 @@ dependencies = [
  "fn-error-context",
  "hex",
  "indicatif",
+ "pkg-config",
  "semver",
  "sha2",
  "stylish",
