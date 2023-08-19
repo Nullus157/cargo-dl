@@ -393,8 +393,12 @@ fn main() {
         Err(e) if e.kind() == clap::error::ErrorKind::ValueValidation => {
             use clap::error::{ContextKind, ContextValue};
             use std::error::Error;
-            let Some(ContextValue::String(name)) = e.get(ContextKind::InvalidArg) else { e.exit() };
-            let Some(ContextValue::String(value)) = e.get(ContextKind::InvalidValue) else { e.exit() };
+            let Some(ContextValue::String(name)) = e.get(ContextKind::InvalidArg) else {
+                e.exit()
+            };
+            let Some(ContextValue::String(value)) = e.get(ContextKind::InvalidValue) else {
+                e.exit()
+            };
             println!("Error: invalid value '{value}' for {name}");
             println!();
             if let Some(source) = e.source() {
