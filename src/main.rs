@@ -8,6 +8,7 @@ use anyhow::{anyhow, Context, Error};
 use clap::{CommandFactory, FromArgMatches, Parser};
 use std::{io::Read, time::Duration};
 use tracing_subscriber::EnvFilter;
+use ureq::OrAnyStatus;
 
 const USER_AGENT: &str = concat!("cargo-dl/", env!("CARGO_PKG_VERSION"));
 const CRATE_SIZE_LIMIT: u64 = 40 * 1024 * 1024;
@@ -67,6 +68,18 @@ struct App {
     slooooow: bool,
 }
 
+#[fehler::throws]
+fn read_response(
+    response: http::Response<Box<dyn Read + Send + Sync + 'static>>,
+) -> http::Response<Vec<u8>> {
+    let (head, mut body) = response.into_parts();
+    // no index file should be over 1MB
+    let mut bytes = Vec::with_capacity(1024 * 1024);
+    body.by_ref().take(1024 * 1024).read_to_end(&mut bytes)?;
+    anyhow::ensure!(body.read(&mut [0])? == 0, "response too long");
+    http::Response::from_parts(head, bytes)
+}
+
 /// Failed to acquire one or more crates, see above for details
 #[derive(thiserror::Error, Copy, Clone, Debug, displaydoc::Display)]
 struct LoggedError;
@@ -101,40 +114,40 @@ impl App {
 
         let bars: &indicatif::MultiProgress = Box::leak(Box::new(indicatif::MultiProgress::new()));
         let thread = std::thread::spawn(move || {
-            let mut index = crates_index::Index::new_cargo_default()?;
-            if self.update_index {
-                let bar = bars
-                    .add(indicatif::ProgressBar::new_spinner())
-                    .with_style(spinner_style.clone())
-                    .with_prefix("crates.io index")
-                    .with_message("updating");
-                bar.enable_steady_tick(Duration::from_millis(100));
-                index.update()?;
-                self.slow();
-
-                bar.set_style(success_style.clone());
-                bar.finish_with_message("updated");
-            }
-
             let threads = Vec::from_iter(self.specs.iter().map(|spec| {
                 let bar = bars.add(indicatif::ProgressBar::new_spinner()).with_style(spinner_style.clone());
                 (spec, std::thread::spawn(|| {
                     let bar = bar;
                     bar.tick();
                     bar.set_prefix(spec.to_string());
-                    let index = crates_index::Index::new_cargo_default()?;
+                    let index = crates_index::SparseIndex::new_cargo_default()?;
+                    // TODO: fuzzy name matching https://github.com/frewsxcv/rust-crates-index/issues/75
+                    let krate = if self.update_index {
+                        bar.set_style(spinner_style.clone());
+                        bar.set_message("updating index");
+                        bar.enable_steady_tick(Duration::from_millis(100));
+                        let request = index.make_cache_request(&spec.name.0)?;
+                        let request = ureq::Request::from(request).set("User-Agent", USER_AGENT);
+                        let response = request.call().or_any_status()?;
+                        let response = read_response(response.into())?;
+                        self.slow();
+                        index.parse_cache_response(&spec.name.0, response, true)?
+                    } else {
+                        match index.crate_from_cache(&spec.name.0) {
+                            Ok(krate) => Ok(Some(krate)),
+                            Err(crates_index::Error::Io(e)) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
+                            Err(e) => Err(e),
+                        }?
+                    };
+                    let Some(krate) = krate else {
+                        bar.set_style(failure_style.clone());
+                        bar.finish_with_message("could not find crate in the index");
+                        return Err(LoggedError.into());
+                    };
+
                     bar.set_message("selecting version");
                     bar.enable_steady_tick(Duration::from_millis(100));
                     self.slow();
-                    // TODO: fuzzy name matching https://github.com/frewsxcv/rust-crates-index/issues/75
-                    let krate = match index.crate_(&spec.name.0) {
-                        Some(krate) => krate,
-                        None => {
-                            bar.set_style(failure_style.clone());
-                            bar.finish_with_message("could not find crate in the index");
-                            return Err(LoggedError.into());
-                        }
-                    };
 
                     tracing::debug!(
                         "all available versions: {:?}",
@@ -213,7 +226,8 @@ impl App {
                     let cached = if self.cache {
                         bar.set_message(stylish::ansi::format!("checking cache for {:s}", version_str));
                         self.slow();
-                        cache::lookup(&index, version)
+                        // TODO: https://github.com/frewsxcv/rust-crates-index/issues/149
+                        cache::lookup_all(&[crates_index::sparse::URL, "https://github.com/rust-lang/crates.io-index"], version)
                     } else {
                         Err(anyhow!("cache disabled by flag"))
                     };

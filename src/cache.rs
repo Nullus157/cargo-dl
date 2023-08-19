@@ -1,5 +1,5 @@
 use anyhow::{anyhow, Context, Error};
-use crates_index::{Index, Version};
+use crates_index::Version;
 use std::path::PathBuf;
 
 #[fehler::throws]
@@ -15,9 +15,11 @@ fn sha256_file(path: impl AsRef<std::path::Path>) -> [u8; 32] {
 }
 
 #[fehler::throws]
-#[fn_error_context::context("finding cache dir for registry {}", index.path().display())]
-pub(crate) fn find_cache_dir(index: &Index) -> std::path::PathBuf {
-    let mut components = index.path().components();
+#[fn_error_context::context("finding cache dir for registry {}", url)]
+pub(crate) fn find_cache_dir(url: &str) -> std::path::PathBuf {
+    let (path, _) = crates_index::local_path_and_canonical_url(url, None)?;
+    let mut components = path.components();
+
     let dirname = components
         .next_back()
         .context("missing index dirname")?
@@ -53,10 +55,10 @@ pub(crate) fn find_cache_dir(index: &Index) -> std::path::PathBuf {
     "failed finding cached file for {}@{} in registry {}",
     version.name(),
     version.version(),
-    index.path().display(),
+    url,
 )]
-pub(crate) fn lookup(index: &Index, version: &Version) -> PathBuf {
-    let cache_dir = find_cache_dir(index)?;
+pub(crate) fn lookup(url: &str, version: &Version) -> PathBuf {
+    let cache_dir = find_cache_dir(url)?;
 
     let cache_file = cache_dir.join(format!("{}-{}.crate", version.name(), version.version()));
     if !cache_file.exists() {
@@ -76,4 +78,20 @@ pub(crate) fn lookup(index: &Index, version: &Version) -> PathBuf {
     }
 
     cache_file
+}
+
+#[fehler::throws]
+pub(crate) fn lookup_all(urls: &[&str], version: &Version) -> PathBuf {
+    for url in urls {
+        match lookup(url, version) {
+            Ok(path) => return path,
+            Err(err) => tracing::debug!("{err:?}"),
+        }
+    }
+    fehler::throw!(anyhow!(
+        "failed finding cached file for {}@{} in registries {:?}",
+        version.name(),
+        version.version(),
+        urls
+    ));
 }
