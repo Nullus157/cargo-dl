@@ -31,7 +31,7 @@ ureq = { version = "2.6.2", default-features = false, features = ["gzip", "brotl
 proc-macro2 = { version = "1.0.60", optional = true, default-features = false }
 
 # avoid precompiled binaries https://github.com/serde-rs/serde/issues/2538
-serde_derive = { version = "1.0, <1.0.172", optional = true, default-features = false }
+serde_derive = { version = "1.0, <1.0.172", default-features = false }
 
 [build-dependencies]
 # enforce working minimal-versions
