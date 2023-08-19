@@ -2,7 +2,7 @@ use anyhow::{anyhow, Context, Error};
 use crates_index::Version;
 use std::path::PathBuf;
 
-#[fehler::throws]
+#[culpa::throws]
 #[fn_error_context::context("hashing {}", path.as_ref().display())]
 fn sha256_file(path: impl AsRef<std::path::Path>) -> [u8; 32] {
     use sha2::Digest;
@@ -14,7 +14,7 @@ fn sha256_file(path: impl AsRef<std::path::Path>) -> [u8; 32] {
     *hasher.finalize().as_ref()
 }
 
-#[fehler::throws]
+#[culpa::throws]
 #[fn_error_context::context("finding cache dir for registry {}", url)]
 pub(crate) fn find_cache_dir(url: &str) -> std::path::PathBuf {
     let (path, _) = crates_index::local_path_and_canonical_url(url, None)?;
@@ -34,7 +34,7 @@ pub(crate) fn find_cache_dir(url: &str) -> std::path::PathBuf {
         .as_os_str();
 
     if parent != "index" || grandparent != "registry" {
-        fehler::throw!(anyhow!("unexpected registry cache structure"));
+        culpa::throw!(anyhow!("unexpected registry cache structure"));
     }
 
     let cache_path = components
@@ -44,13 +44,13 @@ pub(crate) fn find_cache_dir(url: &str) -> std::path::PathBuf {
         .join(dirname);
 
     if !cache_path.exists() {
-        fehler::throw!(anyhow!("cache dir {} does not exist", cache_path.display()));
+        culpa::throw!(anyhow!("cache dir {} does not exist", cache_path.display()));
     }
 
     cache_path
 }
 
-#[fehler::throws]
+#[culpa::throws]
 #[fn_error_context::context(
     "failed finding cached file for {}@{} in registry {}",
     version.name(),
@@ -62,7 +62,7 @@ pub(crate) fn lookup(url: &str, version: &Version) -> PathBuf {
 
     let cache_file = cache_dir.join(format!("{}-{}.crate", version.name(), version.version()));
     if !cache_file.exists() {
-        fehler::throw!(anyhow!(
+        culpa::throw!(anyhow!(
             "cache file {} does not exist",
             cache_file.display()
         ));
@@ -70,7 +70,7 @@ pub(crate) fn lookup(url: &str, version: &Version) -> PathBuf {
 
     let calculated_checksum = sha256_file(&cache_file)?;
     if &calculated_checksum != version.checksum() {
-        fehler::throw!(anyhow!(
+        culpa::throw!(anyhow!(
             "invalid checksum, expected {} but got {}",
             hex::encode(version.checksum()),
             hex::encode(calculated_checksum)
@@ -80,7 +80,7 @@ pub(crate) fn lookup(url: &str, version: &Version) -> PathBuf {
     cache_file
 }
 
-#[fehler::throws]
+#[culpa::throws]
 pub(crate) fn lookup_all(urls: &[&str], version: &Version) -> PathBuf {
     for url in urls {
         match lookup(url, version) {
@@ -88,7 +88,7 @@ pub(crate) fn lookup_all(urls: &[&str], version: &Version) -> PathBuf {
             Err(err) => tracing::debug!("{err:?}"),
         }
     }
-    fehler::throw!(anyhow!(
+    culpa::throw!(anyhow!(
         "failed finding cached file for {}@{} in registries {:?}",
         version.name(),
         version.version(),
