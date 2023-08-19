@@ -1,6 +1,6 @@
 [package]
 name = "cargo-dl"
-version = "0.1.2"
+version = "0.1.3"
 edition = "2021"
 description = "Cargo subcommand for downloading crate sources"
 repository = "https://github.com/Nullus157/cargo-dl"
@@ -31,7 +31,7 @@ ureq = { version = "2.6.2", default-features = false, features = ["gzip", "brotl
 proc-macro2 = { version = "1.0.60", optional = true, default-features = false }
 
 # avoid precompiled binaries https://github.com/serde-rs/serde/issues/2538
-serde_derive = { version = "1.0, <1.0.172", optional = true, default-features = false }
+serde_derive = { version = "1.0, <1.0.172", default-features = false }
 
 [build-dependencies]
 # enforce working minimal-versions
