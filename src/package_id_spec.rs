@@ -17,7 +17,7 @@ pub(crate) enum ParseError {
 impl std::str::FromStr for PackageIdSpec {
     type Err = ParseError;
 
-    #[fehler::throws(ParseError)]
+    #[culpa::throws(ParseError)]
     fn from_str(s: &str) -> Self {
         let parse_crate_name = |s: &str| {
             s.parse::<CrateName>()
@@ -42,7 +42,7 @@ impl std::str::FromStr for PackageIdSpec {
 }
 
 impl std::fmt::Display for PackageIdSpec {
-    #[fehler::throws(std::fmt::Error)]
+    #[culpa::throws(std::fmt::Error)]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) {
         if let PackageIdSpec {
             name,

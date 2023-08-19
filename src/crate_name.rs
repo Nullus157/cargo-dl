@@ -10,21 +10,21 @@ pub(crate) enum ParseError {
 impl std::str::FromStr for CrateName {
     type Err = ParseError;
 
-    #[fehler::throws(ParseError)]
+    #[culpa::throws(ParseError)]
     fn from_str(s: &str) -> Self {
         if let Some((index, char)) = s
             .chars()
             .enumerate()
             .find(|(_, c)| !c.is_alphanumeric() && !['-', '_'].contains(c))
         {
-            fehler::throw!(ParseError::InvalidCharacter(char, index));
+            culpa::throw!(ParseError::InvalidCharacter(char, index));
         }
         CrateName(s.to_owned())
     }
 }
 
 impl std::fmt::Display for CrateName {
-    #[fehler::throws(std::fmt::Error)]
+    #[culpa::throws(std::fmt::Error)]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) {
         f.pad(&self.0)?;
     }

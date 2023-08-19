@@ -68,7 +68,7 @@ struct App {
     slooooow: bool,
 }
 
-#[fehler::throws]
+#[culpa::throws]
 fn read_response(
     response: http::Response<Box<dyn Read + Send + Sync + 'static>>,
 ) -> http::Response<Vec<u8>> {
@@ -91,11 +91,11 @@ impl App {
         }
     }
 
-    #[fehler::throws]
+    #[culpa::throws]
     #[tracing::instrument(fields(%self))]
     fn run(&'static self) {
         if self.specs.len() > 1 && self.output.is_some() {
-            fehler::throw!(anyhow!("cannot use --output with multiple crates"));
+            culpa::throw!(anyhow!("cannot use --output with multiple crates"));
         }
 
         let spinner_style = Box::leak(Box::new(
@@ -318,7 +318,7 @@ impl App {
                             if e.is::<LoggedError>() {
                                 logged_error = true;
                             } else {
-                                fehler::throw!(e.context(format!("could not acquire {}", spec)));
+                                culpa::throw!(e.context(format!("could not acquire {}", spec)));
                             }
                         }
                         Err(e) => std::panic::resume_unwind(e),
@@ -328,13 +328,13 @@ impl App {
             Err(e) => std::panic::resume_unwind(e),
         }
         if logged_error {
-            fehler::throw!(LoggedError);
+            culpa::throw!(LoggedError);
         }
     }
 }
 
 impl std::fmt::Display for App {
-    #[fehler::throws(std::fmt::Error)]
+    #[culpa::throws(std::fmt::Error)]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) {
         write!(f, "cargo dl")?;
         if self.allow_yanked {
@@ -353,13 +353,13 @@ impl std::fmt::Display for App {
     }
 }
 
-#[fehler::throws]
+#[culpa::throws]
 #[fn_error_context::context("parsing directive {:?}", directive)]
 fn parse_directive(directive: &str) -> tracing_subscriber::filter::Directive {
     directive.parse()?
 }
 
-#[fehler::throws]
+#[culpa::throws]
 #[fn_error_context::context("getting directive from env var {:?}", var)]
 fn get_env_directive(var: &str) -> Option<tracing_subscriber::filter::Directive> {
     if let Some(var) = std::env::var_os("CARGO_DL_LOG") {
@@ -379,7 +379,7 @@ fn env_filter() -> (EnvFilter, Option<anyhow::Error>) {
     }
 }
 
-#[fehler::throws]
+#[culpa::throws]
 fn main() {
     let (env_filter, err) = env_filter();
     tracing_subscriber::fmt()

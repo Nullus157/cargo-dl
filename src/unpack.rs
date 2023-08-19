@@ -1,7 +1,7 @@
 use anyhow::{anyhow, Context, Error};
 use std::path::{Component, Path};
 
-#[fehler::throws]
+#[culpa::throws]
 pub(crate) fn unpack(
     version: &crates_index::Version,
     mut archive: tar::Archive<impl std::io::Read>,
@@ -19,7 +19,7 @@ pub(crate) fn unpack(
                 Component::ParentDir | Component::RootDir | Component::Prefix(_)
             )
         }) {
-            fehler::throw!(anyhow!(
+            culpa::throw!(anyhow!(
                 "a file in the archive ({}) contains a .. or root segment",
                 path.display()
             ));
