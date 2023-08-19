@@ -143,6 +143,7 @@ dependencies = [
  "pkg-config",
  "proc-macro2",
  "semver",
+ "serde_derive",
  "sha2",
  "stylish",
  "tar",
