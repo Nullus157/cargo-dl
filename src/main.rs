@@ -226,8 +226,7 @@ impl App {
                     let cached = if self.cache {
                         bar.set_message(stylish::ansi::format!("checking cache for {:s}", version_str));
                         self.slow();
-                        // TODO: https://github.com/frewsxcv/rust-crates-index/issues/149
-                        cache::lookup_all(&[crates_index::sparse::URL, "https://github.com/rust-lang/crates.io-index"], version)
+                        cache::lookup_all(&[crates_index::sparse::URL, crates_index::git::URL], version)
                     } else {
                         Err(anyhow!("cache disabled by flag"))
                     };
