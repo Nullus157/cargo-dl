@@ -27,12 +27,13 @@ tracing = { version = "0.1.37", default-features = false, features = ["attribute
 tracing-subscriber = { version = "0.3.17", default-features = false, features = ["env-filter", "fmt", "ansi", "tracing-log"] }
 ureq = { version = "2.6.2", default-features = false, features = ["gzip", "brotli", "tls", "http-interop"] }
 
+[target.'cfg(any())'.dependencies]
 # enforce working minimal-versions
-proc-macro2 = { version = "1.0.60", optional = true, default-features = false }
+proc-macro2 = { version = "1.0.60", default-features = false }
 
 # avoid precompiled binaries https://github.com/serde-rs/serde/issues/2538
-serde_derive = { version = "1.0, <1.0.172", default-features = false }
+serde_derive = { version = "1.0.185", default-features = false }
 
-[build-dependencies]
+[target.'cfg(any())'.build-dependencies]
 # enforce working minimal-versions
-pkg-config = { version = "0.3.27", optional = true, default-features = false }
+pkg-config = { version = "0.3.27", default-features = false }
