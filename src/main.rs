@@ -84,6 +84,43 @@ fn read_response(
 #[derive(thiserror::Error, Copy, Clone, Debug, displaydoc::Display)]
 struct LoggedError;
 
+#[culpa::throws]
+fn find_crate_in_index(
+    app: &App,
+    index: &crates_index::SparseIndex,
+    name: &str,
+    bar: &indicatif::ProgressBar,
+) -> Option<(String, crates_index::Crate)> {
+    for name in crates_index::Names::new(name)
+        .map(|i| i.collect())
+        .unwrap_or_else(|| vec![name.to_owned()])
+    {
+        bar.set_message(stylish::ansi::format!(
+            "querying index for {:(fg=magenta)}",
+            name
+        ));
+        if app.update_index {
+            let request = index.make_cache_request(&name)?;
+            let request = ureq::Request::from(request).set("User-Agent", USER_AGENT);
+            let response = request.call().or_any_status()?;
+            let response = read_response(response.into())?;
+            app.slow();
+            if let Some(krate) = index.parse_cache_response(&name, response, true)? {
+                return Some((name, krate));
+            }
+        } else {
+            match index.crate_from_cache(&name) {
+                Ok(krate) => return Some((name, krate)),
+                Err(crates_index::Error::Io(e)) if e.kind() == std::io::ErrorKind::NotFound => {
+                    continue
+                }
+                Err(e) => anyhow::bail!(e),
+            }
+        }
+    }
+    None
+}
+
 impl App {
     fn slow(&self) {
         if self.slooooow {
@@ -120,30 +157,17 @@ impl App {
                     let bar = bar;
                     bar.tick();
                     bar.set_prefix(spec.to_string());
+                    bar.set_style(spinner_style.clone());
+                    bar.enable_steady_tick(Duration::from_millis(100));
                     let index = crates_index::SparseIndex::new_cargo_default()?;
-                    // TODO: fuzzy name matching https://github.com/frewsxcv/rust-crates-index/issues/75
-                    let krate = if self.update_index {
-                        bar.set_style(spinner_style.clone());
-                        bar.set_message("updating index");
-                        bar.enable_steady_tick(Duration::from_millis(100));
-                        let request = index.make_cache_request(&spec.name.0)?;
-                        let request = ureq::Request::from(request).set("User-Agent", USER_AGENT);
-                        let response = request.call().or_any_status()?;
-                        let response = read_response(response.into())?;
-                        self.slow();
-                        index.parse_cache_response(&spec.name.0, response, true)?
-                    } else {
-                        match index.crate_from_cache(&spec.name.0) {
-                            Ok(krate) => Ok(Some(krate)),
-                            Err(crates_index::Error::Io(e)) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
-                            Err(e) => Err(e),
-                        }?
-                    };
-                    let Some(krate) = krate else {
+                    let Some((name, krate)) = find_crate_in_index(self, &index, &spec.name.0, &bar)? else {
                         bar.set_style(failure_style.clone());
                         bar.finish_with_message("could not find crate in the index");
                         return Err(LoggedError.into());
                     };
+                    if name != spec.name.0 {
+                        tracing::warn!("Corrected name from {} to {name}", spec.name.0);
+                    }
 
                     bar.set_message("selecting version");
                     bar.enable_steady_tick(Duration::from_millis(100));
