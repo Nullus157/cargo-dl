@@ -1,7 +1,5 @@
 [advisories]
 ignore = [
-  # https://github.com/tokio-rs/tracing/issues/2282
-  "RUSTSEC-2021-0139",
 ]
 
 [licenses]
