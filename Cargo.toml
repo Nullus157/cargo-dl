@@ -8,7 +8,7 @@ license = "MIT OR Apache-2.0"
 
 [dependencies]
 anyhow = { version = "1.0.71", default-features = false, features = ["std"] }
-clap = { version = "4.3.0", default-features = false, features = ["std", "derive", "color", "wrap_help", "error-context", "cargo", "suggestions", "usage"] }
+clap = { version = "4.4.4", default-features = false, features = ["std", "derive", "color", "wrap_help", "error-context", "cargo", "suggestions", "usage"] }
 crates-index = { version = "2.1.1", default-features = false, features = ["sparse"] }
 culpa = { version = "1.0.1", default-features = false }
 displaydoc = { version = "0.2.4", default-features = false }
@@ -21,7 +21,7 @@ semver = { version = "1.0.17", default-features = false }
 sha2 = { version = "0.10.6", default-features = false, features = ["std"] }
 stylish = { version = "0.1.0", default-features = false, features = ["std", "ansi", "macros"] }
 tar = { version = "0.4.38", default-features = false }
-terminal_size = { version = "0.2.6", default-features = false }
+terminal_size = { version = "0.3.0", default-features = false }
 thiserror = { version = "1.0.40", default-features = false }
 tracing = { version = "0.1.37", default-features = false, features = ["attributes", "std"] }
 tracing-subscriber = { version = "0.3.17", default-features = false, features = ["env-filter", "fmt", "ansi", "tracing-log"] }
@@ -30,6 +30,7 @@ ureq = { version = "2.6.2", default-features = false, features = ["gzip", "brotl
 [target.'cfg(any())'.dependencies]
 # enforce working minimal-versions
 proc-macro2 = { version = "1.0.60", default-features = false }
+stylish-core = { version = "0.1.1", default-features = false }
 
 # avoid precompiled binaries https://github.com/serde-rs/serde/issues/2538
 serde_derive = { version = "1.0.185", default-features = false }
