@@ -80,6 +80,14 @@ fn read_response(
     http::Response::from_parts(head, bytes)
 }
 
+#[culpa::throws]
+fn do_index_request(app: &App, request: http::request::Builder) -> http::Response<Vec<u8>> {
+    let request = ureq::Request::from(request).set("User-Agent", USER_AGENT);
+    let response = request.call().or_any_status()?;
+    app.slow();
+    read_response(response.into())?
+}
+
 /// Failed to acquire one or more crates, see above for details
 #[derive(thiserror::Error, Copy, Clone, Debug, displaydoc::Display)]
 struct LoggedError;
@@ -100,11 +108,7 @@ fn find_crate_in_index(
             name
         ));
         if app.update_index {
-            let request = index.make_cache_request(&name)?;
-            let request = ureq::Request::from(request).set("User-Agent", USER_AGENT);
-            let response = request.call().or_any_status()?;
-            let response = read_response(response.into())?;
-            app.slow();
+            let response = do_index_request(app, index.make_cache_request(&name)?)?;
             if let Some(krate) = index.parse_cache_response(&name, response, true)? {
                 return Some((name, krate));
             }
@@ -119,6 +123,19 @@ fn find_crate_in_index(
         }
     }
     None
+}
+
+#[culpa::throws]
+#[fn_error_context::context("getting index config for {}", index.url())]
+fn config(app: &App, index: &crates_index::SparseIndex) -> crates_index::IndexConfig {
+    if app.update_index {
+        let response = do_index_request(app, index.make_config_request()?)?;
+        index.parse_config_response(response, true)?
+    } else {
+        index
+            .index_config()
+            .context("loading config.json from disk")?
+    }
 }
 
 impl App {
@@ -151,6 +168,20 @@ impl App {
 
         let bars: &indicatif::MultiProgress = Box::leak(Box::new(indicatif::MultiProgress::new()));
         let thread = std::thread::spawn(move || {
+            let config = {
+                let bar = bars
+                    .add(indicatif::ProgressBar::new_spinner())
+                    .with_style(spinner_style.clone())
+                    .with_prefix("index")
+                    .with_message(stylish::ansi::format!(
+                        "downloading {:(fg=magenta)}",
+                        "config.json"
+                    ));
+                bar.enable_steady_tick(Duration::from_millis(100));
+                let index = crates_index::SparseIndex::new_cargo_default()?;
+                Box::leak(Box::new(config(self, &index)?))
+            };
+
             let threads = Vec::from_iter(self.specs.iter().map(|spec| {
                 let bar = bars.add(indicatif::ProgressBar::new_spinner()).with_style(spinner_style.clone());
                 (spec, std::thread::spawn(|| {
@@ -280,7 +311,7 @@ impl App {
                         Err(err) => {
                             use sha2::Digest;
                             tracing::debug!("{err:?}");
-                            let url = version.download_url(&index.index_config()?).context("missing download url")?;
+                            let url = version.download_url(config).context("missing download url")?;
                             bar.set_message(stylish::ansi::format!("downloading {:s}", version_str));
                             let resp = ureq::get(&url).set("User-Agent", USER_AGENT).call()?;
                             let mut data;
