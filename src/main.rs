@@ -72,8 +72,8 @@ struct App {
 fn read_response(
     response: http::Response<Box<dyn Read + Send + Sync + 'static>>,
 ) -> http::Response<Vec<u8>> {
-    // no index file should be over 1MB
-    const MAX_INDEX_FILE_SIZE: u64 = 1024 * 1024;
+    // no index file should be over 10MB
+    const MAX_INDEX_FILE_SIZE: u64 = 1024 * 1024 * 10;
 
     let (head, mut body) = response.into_parts();
     let mut bytes = Vec::with_capacity(MAX_INDEX_FILE_SIZE as usize);
